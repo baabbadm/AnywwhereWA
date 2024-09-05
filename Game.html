@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catch the Falling Stars</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #282c34;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #61dafb;
+            background-color: #20232a;
+        }
+        #controls {
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background-color: #61dafb;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #21a1f1;
+        }
+        button:disabled {
+            background-color: #b0bec5;
+            cursor: not-allowed;
+        }
+        #celebrationMessage {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 30px;
+            font-weight: bold;
+            color: #ffdd57;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <div id="controls">
+        <button id="shareScore">Share Score</button>
+        <button id="downloadScreenshot">Download Screenshot</button>
+        <button id="restartGame">Restart Game</button>
+        <button id="resetScore">Reset High Score</button>
+    </div>
+    <div id="celebrationMessage">Congratulations! The game is getting faster!</div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const celebrationMessage = document.getElementById('celebrationMessage');
+
+        let basket = {
+            x: canvas.width / 2 - 50,
+            y: canvas.height - 30,
+            width: 100,
+            height: 20,
+            color: '#61dafb',
+            dx: 0,
+            speed: 5
+        };
+
+        let star = {
+            x: Math.random() * (canvas.width - 20),
+            y: -20,
+            width: 20,
+            height: 20,
+            color: '#f1c40f',
+            dy: 3 // Default falling speed
+        };
+
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        let gameOver = false;
+        let celebrationShown = false;
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawBasket() {
+            ctx.fillStyle = basket.color;
+            ctx.fillRect(basket.x, basket.y, basket.width, basket.height);
+        }
+
+        function drawStar() {
+            ctx.fillStyle = star.color;
+            ctx.beginPath();
+            ctx.moveTo(star.x + star.width / 2, star.y);
+            ctx.lineTo(star.x + star.width, star.y + star.height);
+            ctx.lineTo(star.x, star.y + star.height);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawScore() {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 20);
+            ctx.fillText(`High Score: ${highScore}`, canvas.width - 150, 20);
+        }
+
+        function drawGameOver() {
+            ctx.fillStyle = '#ff4747';
+            ctx.font = '40px Arial';
+            ctx.fillText('Game Over', canvas.width / 4, canvas.height / 2);
+        }
+
+        function showCelebration() {
+            celebrationMessage.style.display = 'block';
+            setTimeout(() => {
+                celebrationMessage.style.display = 'none';
+            }, 2000); // Hide message after 2 seconds
+        }
+
+        function updateBasketSize() {
+            if (score >= 150 && score % 150 === 0) {
+                basket.width = Math.max(basket.width - 10, 20); // Minimum width 20
+            }
+        }
+
+        function updateStarSpeed() {
+            if (score > 300) {
+                star.dy = 4; // Increase falling speed moderately if score is over 300
+            } else {
+                star.dy = 3; // Default falling speed
+            }
+        }
+
+        function updateBasketPosition() {
+            basket.x += basket.dx;
+
+            if (basket.x < 0) basket.x = 0;
+            if (basket.x + basket.width > canvas.width) basket.x = canvas.width - basket.width;
+        }
+
+        function updateStarPosition() {
+            star.y += star.dy;
+
+            if (star.y > canvas.height) {
+                star.x = Math.random() * (canvas.width - star.width);
+                star.y = -star.height;
+                gameOver = true; // End game if star falls off the canvas
+            }
+
+            // Check for collision with basket
+            if (star.x < basket.x + basket.width &&
+                star.x + star.width > basket.x &&
+                star.y < basket.y + basket.height &&
+                star.y + star.height > basket.y) {
+                score += 10;
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('highScore', highScore);
+                }
+                star.x = Math.random() * (canvas.width - star.width);
+                star.y = -star.height;
+                updateBasketSize(); // Update basket size based on score
+                updateStarSpeed(); // Adjust star speed based on score
+                
+                // Show celebration if score is 300 or more
+                if (score >= 300 && !celebrationShown) {
+                    showCelebration();
+                    celebrationShown = true;
+                }
+            }
+        }
+
+        function moveBasket(e) {
+            switch (e.key) {
+                case 'ArrowRight':
+                    basket.dx = basket.speed;
+                    break;
+                case 'ArrowLeft':
+                    basket.dx = -basket.speed;
+                    break;
+            }
+        }
+
+        function stopBasket(e) {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                basket.dx = 0;
+            }
+        }
+
+        function updateGame() {
+            if (!gameOver) {
+                clearCanvas();
+                drawBasket();
+                drawStar();
+                drawScore();
+                updateBasketPosition();
+                updateStarPosition();
+
+                requestAnimationFrame(updateGame);
+            } else {
+                drawGameOver();
+                document.getElementById('restartGame').disabled = false; // Enable restart button
+            }
+        }
+
+        function restartGame() {
+            score = 0;
+            basket.width = 100;
+            basket.x = canvas.width / 2 - 50;
+            star.x = Math.random() * (canvas.width - star.width);
+            star.y = -star.height;
+            gameOver = false;
+            celebrationShown = false;
+            document.getElementById('restartGame').disabled = true; // Disable restart button until game over
+            updateGame();
+        }
+
+        function captureCanvas() {
+            return canvas.toDataURL('image/png');
+        }
+
+        function shareScore() {
+            const text = `Hey, I got a score of ${score} in Anywhere WA game! Try it now: ${window.location.href}`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Catch the Falling Stars',
+                    text: text
+                }).catch(console.error);
+            } else {
+                alert('Sharing is not supported on your browser.');
+            }
+        }
+
+        function downloadScreenshot() {
+            const dataUrl = captureCanvas();
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = 'game-screenshot.png';
+            link.click();
+        }
+
+        function resetHighScore() {
+            localStorage.removeItem('highScore');
+            highScore = 0;
+            drawScore(); // Update score display
+        }
+
+        document.getElementById('shareScore').addEventListener('click', shareScore);
+        document.getElementById('downloadScreenshot').addEventListener('click', downloadScreenshot);
+        document.getElementById('restartGame').addEventListener('click', restartGame);
+        document.getElementById('resetScore').addEventListener('click', resetHighScore);
+        document.addEventListener('keydown', moveBasket);
+        document.addEventListener('keyup', stopBasket);
+
+        updateGame();
+    </script>
+</body>
+</html>
